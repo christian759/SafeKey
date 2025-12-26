@@ -39,13 +39,19 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             const savedPin = await AsyncStorage.getItem('user-pin');
 
             if (savedTheme) setThemeState(savedTheme as ThemeType);
-            if (savedLock) {
-                const enabled = savedLock === 'true';
-                setAppLockEnabledState(enabled);
-                if (enabled) setIsLocked(true);
+
+            const isLockEnabled = savedLock === 'true';
+            setAppLockEnabledState(isLockEnabled);
+
+            if (savedPin) {
+                setPinState(savedPin);
+                setIsLocked(isLockEnabled);
+            } else {
+                // First launch - Force lock for PIN setup
+                setIsLocked(true);
             }
+
             if (savedBiometrics) setBiometricsEnabledState(savedBiometrics === 'true');
-            if (savedPin) setPinState(savedPin);
         } catch (error) {
             console.error('Failed to load settings', error);
         } finally {

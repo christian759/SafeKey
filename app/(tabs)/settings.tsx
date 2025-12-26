@@ -5,13 +5,13 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { getDatabase } from '@/services/database';
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function SettingsScreen() {
     const colorScheme = useColorScheme() ?? 'light';
-
-    const [biometrics, setBiometrics] = React.useState(true);
-    const [darkMode, setDarkMode] = React.useState(colorScheme === 'dark');
+    const [showPinModal, setShowPinModal] = React.useState(false);
+    const [tempPin, setTempPin] = React.useState('');
+    const [pinPurpose, setPinPurpose] = React.useState<'set' | 'change'>('set');
 
     const handleClearData = () => {
         Alert.alert(
@@ -32,6 +32,28 @@ export default function SettingsScreen() {
         );
     };
 
+    const handleAppLockToggle = async (value: boolean) => {
+        // App Lock can only be turned on if a PIN exists (LockScreen handles first launch)
+        if (value && !pin) {
+            // This case should theoretically not happen if LockScreen works as intended
+            Alert.alert('Security Required', 'Please set up your PIN first.');
+        } else {
+            setAppLockEnabled(value);
+        }
+    };
+
+    const handlePinSubmit = () => {
+        if (tempPin.length === 4) {
+            setPin(tempPin);
+            if (pinPurpose === 'set') setAppLockEnabled(true);
+            setShowPinModal(false);
+            setTempPin('');
+            Alert.alert('Success', pinPurpose === 'set' ? 'PIN set successfully.' : 'PIN updated successfully.');
+        } else {
+            Alert.alert('Error', 'PIN must be 4 digits.');
+        }
+    };
+
     return (
         <ThemedView style={styles.container}>
             <View style={styles.header}>
@@ -41,25 +63,44 @@ export default function SettingsScreen() {
             <ScrollView contentContainerStyle={styles.content}>
                 <Section title="Security">
                     <SettingRow
-                        icon="faceid"
-                        label="Use Biometrics"
-                        value={biometrics}
-                        onValueChange={setBiometrics}
+                        icon="lock.fill"
+                        label="App Lock"
+                        value={isAppLockEnabled}
+                        onValueChange={handleAppLockToggle}
                         type="switch"
                     />
                     <SettingRow
-                        icon="lock.fill"
-                        label="App Lock"
-                        onPress={() => { }}
+                        icon="faceid"
+                        label="Use Biometrics"
+                        value={isBiometricsEnabled}
+                        onValueChange={setBiometricsEnabled}
+                        type="switch"
                     />
+                    {isAppLockEnabled && (
+                        <SettingRow
+                            icon="key.fill"
+                            label="Change PIN"
+                            onPress={() => {
+                                setPinPurpose('change');
+                                setShowPinModal(true);
+                            }}
+                        />
+                    )}
                 </Section>
 
                 <Section title="Appearance">
                     <SettingRow
                         icon="moon.fill"
                         label="Dark Mode"
-                        value={darkMode}
-                        onValueChange={setDarkMode}
+                        value={theme === 'dark'}
+                        onValueChange={(v) => setTheme(v ? 'dark' : 'light')}
+                        type="switch"
+                    />
+                    <SettingRow
+                        icon="circle.lefthalf.filled"
+                        label="Use System Theme"
+                        value={theme === 'system'}
+                        onValueChange={(v) => setTheme(v ? 'system' : (colorScheme === 'dark' ? 'dark' : 'light'))}
                         type="switch"
                     />
                 </Section>
@@ -86,6 +127,55 @@ export default function SettingsScreen() {
                     />
                 </Section>
             </ScrollView>
+
+            {/* Simple PIN Modal */}
+            <Modal
+                visible={showPinModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowPinModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { backgroundColor: Colors[colorScheme].card }]}>
+                        <ThemedText style={styles.modalTitle}>
+                            {pinPurpose === 'set' ? 'Set App PIN' : 'Change App PIN'}
+                        </ThemedText>
+                        <ThemedText style={styles.modalSubtitle}>
+                            Enter a 4-digit PIN to secure your app
+                        </ThemedText>
+
+                        <View style={styles.modalInputWrapper}>
+                            <TextInput
+                                style={[styles.modalInput, { color: Colors[colorScheme].text, borderBottomColor: Colors[colorScheme].tint }]}
+                                value={tempPin}
+                                onChangeText={setTempPin}
+                                keyboardType="number-pad"
+                                maxLength={4}
+                                secureTextEntry
+                                autoFocus
+                            />
+                        </View>
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, { backgroundColor: 'rgba(0,0,0,0.05)' }]}
+                                onPress={() => {
+                                    setShowPinModal(false);
+                                    setTempPin('');
+                                }}
+                            >
+                                <ThemedText>Cancel</ThemedText>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, { backgroundColor: Colors[colorScheme].tint }]}
+                                onPress={handlePinSubmit}
+                            >
+                                <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>Save</ThemedText>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </ThemedView>
     );
 }
@@ -211,5 +301,51 @@ const styles = StyleSheet.create({
     rightText: {
         fontSize: 14,
         opacity: 0.5,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        width: '80%',
+        padding: 24,
+        borderRadius: 20,
+        alignItems: 'center',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginBottom: 8,
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        opacity: 0.6,
+        textAlign: 'center',
+        marginBottom: 24,
+    },
+    modalInputWrapper: {
+        width: '100%',
+        marginBottom: 24,
+    },
+    modalInput: {
+        fontSize: 32,
+        letterSpacing: 20,
+        textAlign: 'center',
+        borderBottomWidth: 2,
+        paddingBottom: 8,
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        gap: 12,
+        width: '100%',
+    },
+    modalButton: {
+        flex: 1,
+        height: 48,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

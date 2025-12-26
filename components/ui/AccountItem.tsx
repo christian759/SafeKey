@@ -2,7 +2,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Clipboard, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { IconSymbol } from './icon-symbol';
 
 interface AccountItemProps {
@@ -12,32 +12,55 @@ interface AccountItemProps {
     onPress?: () => void;
 }
 
+const BRAND_COLORS: Record<string, string> = {
+    google: '#EA4335',
+    youtube: '#FF0000',
+    facebook: '#1877F2',
+    twitter: '#1DA1F2',
+    spotify: '#1DB954',
+    apple: '#000000',
+    figma: '#F24E1E',
+    skype: '#00AFF0',
+};
+
 export function AccountItem({ name, email, icon, onPress }: AccountItemProps) {
     const colorScheme = useColorScheme() ?? 'light';
+    const colors = Colors[colorScheme];
 
-    const getIconName = () => {
-        if (icon && icon.includes('google')) return 'logo-google';
-        if (icon && icon.includes('youtube')) return 'logo-youtube';
-        if (icon && icon.includes('facebook')) return 'logo-facebook';
-        if (icon && icon.includes('twitter')) return 'logo-twitter';
-        if (icon && icon.includes('spotify')) return 'logo-spotify';
-        if (icon && icon.includes('apple')) return 'logo-apple';
-        if (icon && icon.includes('github')) return 'logo-github';
-        return 'person.circle.fill';
+    const getIconInfo = () => {
+        const lowerIcon = icon?.toLowerCase() || '';
+        const lowerName = name?.toLowerCase() || '';
+
+        for (const brand in BRAND_COLORS) {
+            if (lowerIcon.includes(brand) || lowerName.includes(brand)) {
+                return { name: `logo-${brand}`, color: BRAND_COLORS[brand] };
+            }
+        }
+        return { name: 'person.circle.fill', color: colors.tint };
+    };
+
+    const iconInfo = getIconInfo();
+
+    const handleCopy = (e: any) => {
+        e.stopPropagation();
+        Clipboard.setString(email);
+        Alert.alert('Copied', 'Email copied to clipboard!');
     };
 
     return (
-        <TouchableOpacity style={styles.container} onPress={onPress}>
+        <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.6}>
             <View style={styles.leftSection}>
-                <View style={styles.iconContainer}>
-                    <IconSymbol name={getIconName() as any} size={28} color={Colors[colorScheme].tint} />
+                <View style={[styles.iconContainer, { backgroundColor: `${iconInfo.color}10` }]}>
+                    <IconSymbol name={iconInfo.name as any} size={24} color={iconInfo.color} />
                 </View>
                 <View style={styles.textContainer}>
-                    <ThemedText type="defaultSemiBold" style={styles.name}>{name}</ThemedText>
-                    <ThemedText style={styles.email}>{email}</ThemedText>
+                    <ThemedText type="defaultSemiBold" style={[styles.name, { color: colors.text }]}>{name}</ThemedText>
+                    <ThemedText style={[styles.email, { color: colors.icon }]}>{email}</ThemedText>
                 </View>
             </View>
-            <IconSymbol name="square.on.square" size={20} color={Colors[colorScheme].icon} />
+            <TouchableOpacity onPress={handleCopy} hitSlop={10}>
+                <IconSymbol name="square.on.square" size={20} color={colors.icon} />
+            </TouchableOpacity>
         </TouchableOpacity>
     );
 }
@@ -47,30 +70,31 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingVertical: 12,
+        paddingVertical: 14,
     },
     leftSection: {
         flexDirection: 'row',
         alignItems: 'center',
+        flex: 1,
     },
     iconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 12,
-        backgroundColor: '#F8F9FA',
+        width: 52,
+        height: 52,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 16,
     },
     textContainer: {
         justifyContent: 'center',
+        flex: 1,
     },
     name: {
-        fontSize: 16,
+        fontSize: 17,
+        fontWeight: 'bold',
         marginBottom: 2,
     },
     email: {
-        fontSize: 12,
-        opacity: 0.5,
+        fontSize: 13,
     },
 });

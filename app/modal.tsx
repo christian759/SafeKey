@@ -5,21 +5,66 @@ import { SafeButton } from '@/components/ui/SafeButton';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import Slider from '@react-native-community/slider';
-import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Clipboard, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function PasswordGeneratorModal() {
   const colorScheme = useColorScheme() ?? 'light';
-  const [length, setLength] = React.useState(27);
-  const [options, setOptions] = React.useState({
+  const colors = Colors[colorScheme];
+  const [length, setLength] = useState(27);
+  const [password, setPassword] = useState('');
+  const [options, setOptions] = useState({
     uppercase: true,
     lowercase: true,
     numbers: true,
     symbols: true,
   });
 
+  const generatePassword = useCallback(() => {
+    const charset = {
+      uppercase: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+      lowercase: 'abcdefghijklmnopqrstuvwxyz',
+      numbers: '0123456789',
+      symbols: '!@#$%^&*()_+~`|}{[]:;?><,./-='
+    };
+
+    let characters = '';
+    if (options.uppercase) characters += charset.uppercase;
+    if (options.lowercase) characters += charset.lowercase;
+    if (options.numbers) characters += charset.numbers;
+    if (options.symbols) characters += charset.symbols;
+
+    if (characters === '') {
+      setPassword('');
+      return;
+    }
+
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    setPassword(result);
+  }, [length, options]);
+
+  useEffect(() => {
+    generatePassword();
+  }, [generatePassword]);
+
   const toggleOption = (key: keyof typeof options) => {
     setOptions(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const getStrength = () => {
+    if (length < 8) return { label: 'Weak', color: '#FF4444' };
+    if (length < 12) return { label: 'Medium', color: '#FFA500' };
+    return { label: 'Strong password', color: colors.tint };
+  };
+
+  const strength = getStrength();
+
+  const handleUsePassword = () => {
+    Clipboard.setString(password);
+    Alert.alert('Success', 'Password copied to clipboard!');
   };
 
   return (
@@ -28,15 +73,15 @@ export default function PasswordGeneratorModal() {
 
       <View style={styles.header}>
         <ThemedText type="defaultSemiBold" style={styles.title}>Generate password</ThemedText>
-        <TouchableOpacity>
-          <IconSymbol name="arrow.clockwise" size={20} color={Colors[colorScheme].text} />
+        <TouchableOpacity onPress={generatePassword}>
+          <IconSymbol name="arrow.clockwise" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.passwordContainer}>
-        <ThemedText style={styles.password}>Adssfdyu))092347%.uPADjnjsd</ThemedText>
-        <View style={[styles.badge, { backgroundColor: Colors[colorScheme].secondaryGreen }]}>
-          <ThemedText style={[styles.badgeText, { color: Colors[colorScheme].tint }]}>Strong password</ThemedText>
+        <ThemedText style={[styles.password, { color: colors.text }]}>{password}</ThemedText>
+        <View style={[styles.badge, { backgroundColor: `${strength.color}15` }]}>
+          <ThemedText style={[styles.badgeText, { color: strength.color }]}>{strength.label}</ThemedText>
         </View>
       </View>
 
@@ -51,9 +96,9 @@ export default function PasswordGeneratorModal() {
           maximumValue={50}
           value={length}
           onValueChange={v => setLength(Math.round(v))}
-          minimumTrackTintColor={Colors[colorScheme].tint}
-          maximumTrackTintColor={Colors[colorScheme].border}
-          thumbTintColor={Colors[colorScheme].tint}
+          minimumTrackTintColor={colors.tint}
+          maximumTrackTintColor={colors.border}
+          thumbTintColor={colors.tint}
         />
       </View>
 
@@ -81,7 +126,7 @@ export default function PasswordGeneratorModal() {
       </View>
 
       <View style={styles.footer}>
-        <SafeButton title="Use Password" onPress={() => { }} />
+        <SafeButton title="Use Password" onPress={handleUsePassword} />
       </View>
     </ThemedView>
   );
@@ -89,18 +134,20 @@ export default function PasswordGeneratorModal() {
 
 function OptionToggle({ label, enabled, onPress }: { label: string, enabled: boolean, onPress: () => void }) {
   const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   return (
     <TouchableOpacity
       style={[
         styles.option,
-        { backgroundColor: enabled ? Colors[colorScheme].secondaryGreen : Colors[colorScheme].card }
+        { backgroundColor: enabled ? colors.secondaryGreen : colors.card, borderColor: enabled ? colors.tint : colors.border }
       ]}
       onPress={onPress}
+      activeOpacity={0.7}
     >
-      <View style={[styles.checkbox, { backgroundColor: enabled ? Colors[colorScheme].tint : 'transparent', borderColor: Colors[colorScheme].tint }]}>
+      <View style={[styles.checkbox, { backgroundColor: enabled ? colors.tint : 'transparent', borderColor: enabled ? colors.tint : colors.icon }]}>
         {enabled && <IconSymbol name="checkmark" size={12} color="#FFF" />}
       </View>
-      <ThemedText style={[styles.optionText, { color: Colors[colorScheme].text }]}>{label}</ThemedText>
+      <ThemedText style={[styles.optionText, { color: colors.text }]}>{label}</ThemedText>
     </TouchableOpacity>
   );
 }
@@ -110,8 +157,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 12,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
   },
   handle: {
     width: 40,
@@ -125,76 +170,82 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   passwordContainer: {
-    marginBottom: 32,
+    marginBottom: 40,
   },
   password: {
-    fontSize: 22,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 12,
+    letterSpacing: 0.5,
   },
   badge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
   },
   sliderSection: {
-    marginBottom: 32,
+    marginBottom: 40,
   },
   sliderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   label: {
+    fontSize: 16,
     opacity: 0.6,
   },
   lengthValue: {
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   slider: {
     width: '100%',
-    height: 40,
+    height: 20,
   },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    justifyContent: 'space-between',
     marginBottom: 40,
   },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
     width: '48%',
+    borderWidth: 1,
   },
   checkbox: {
     width: 20,
     height: 20,
     borderRadius: 6,
-    borderWidth: 1,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   optionText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '600',
   },
   footer: {
     marginTop: 'auto',
-    paddingBottom: 20,
+    paddingBottom: 30,
   }
 });
